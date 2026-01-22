@@ -23,6 +23,7 @@ sudo chmod g+w \
 	/tmp/https-mirrors/usr/local/tce.installed/https-mirrors
 
 mksquashfs /tmp/https-mirrors build/https-mirrors.tcz
+cp https-mirrors.tcz.info build/https-mirrors.tcz.info
 
 echo ca-certificates.tcz >>build/https-mirrors.tcz.dep
 
