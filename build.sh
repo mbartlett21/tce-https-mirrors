@@ -27,6 +27,8 @@ cp https-mirrors.tcz.info build/https-mirrors.tcz.info
 
 echo ca-certificates.tcz >>build/https-mirrors.tcz.dep
 
+tar czf build/https-mirrors-source.tgz -X build -X .gitignore *
+
 if [ "$1" == "install" ]; then
 	cp build/https-mirrors.tcz* -t /etc/sysconfig/tcedir/optional
 	echo https-mirrors.tcz >>/etc/sysconfig/tcedir/onboot.lst
