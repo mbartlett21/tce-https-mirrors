@@ -14,9 +14,16 @@ sudo cp COPYING                 /tmp/https-mirrors/usr/local/share/doc/https-mir
 sudo cp https-mirrors.patch     /tmp/https-mirrors/usr/local/https-mirrors/https-mirrors.patch
 sudo cp https-mirrors.installed /tmp/https-mirrors/usr/local/tce.installed/https-mirrors
 
+sudo chown root:staff \
+	/tmp/https-mirrors/usr/local/tce.installed \
+	/tmp/https-mirrors/usr/local/tce.installed/https-mirrors
+
+sudo chmod g+w \
+	/tmp/https-mirrors/usr/local/tce.installed \
+	/tmp/https-mirrors/usr/local/tce.installed/https-mirrors
+
 mksquashfs /tmp/https-mirrors build/https-mirrors.tcz
 
-echo openssl.tcz >>build/https-mirrors.tcz.dep
 echo ca-certificates.tcz >>build/https-mirrors.tcz.dep
 
 if [ "$1" == "install" ]; then
