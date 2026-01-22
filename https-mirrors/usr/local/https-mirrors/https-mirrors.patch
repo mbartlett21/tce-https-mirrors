@@ -1,0 +1,175 @@
+diff --git a/etc/init.d/tc-functions b/etc/init.d/tc-functions
+index 80fbc7a..dddce2b 100755
+--- a/etc/init.d/tc-functions
++++ b/etc/init.d/tc-functions
+@@ -302,8 +302,37 @@ getMirror() {
+ BUILD="$1"
+ [ -z "$BUILD" ] && BUILD=$(getBuild)
+ read MIRROR < /opt/tcemirror
+-#MIRROR="${MIRROR%/}/$(getMajorVer).x/x86/tcz"
++
++MIRRORPROTO="${MIRROR%%://*}"
+ MIRROR="${MIRROR%/}/$(getMajorVer).x/$BUILD/tcz"
++
++# if this is changed also change /usr/bin/tcemirror.sh
++
++# supported protocols for mirror
++if
++  [ "$MIRRORPROTO" != "http" ] &&
++  [ "$MIRRORPROTO" != "https" ] &&
++  [ "$MIRRORPROTO" != "ftp" ]; then
++  echo "Mirror must use http[s] or ftp"
++  exit 1
++fi
++
++# https mirrors can't be done without some extensions
++if [ "$MIRRORPROTO" == "https" ]; then
++  # Test if the required extensions are installed
++  [ -e /usr/local/tce.installed/ca-certificates ] || NeedCrt=1
++  [ -e /usr/local/tce.installed/openssl ] || NeedSSL=1
++
++  if [ -n "$NeedCrt$NeedSSL" ]; then
++    {
++      echo "The following are required before using https mirrors:"
++      [ -n "$NeedCrt" ] && echo "ca-certificates.tcz"
++      [ -n "$NeedSSL" ] && echo "openssl.tcz"
++      echo "Press q to exit"
++    } | less
++    exit 1
++  fi
++fi
+ }
+ 
+ installed() {
+diff --git a/usr/bin/provides.sh b/usr/bin/provides.sh
+index f6aadb1..2cfeb3b 100755
+--- a/usr/bin/provides.sh
++++ b/usr/bin/provides.sh
+@@ -107,16 +107,18 @@ UpdateProvidesDB()
+ 	/bin/ping -A -W 1 -c 2 8.8.8.8 2>&1 > /dev/null || return
+ 
+ 	getMirror
++
++	# zsync only works with http
++	[ "$MIRRORPROTO" == "http" ] && [ -n "`which zsync`" ] && USEZSYNC=yes
++
+ 	cd "$TCEDIR"
+-	if zsync -i "$LIST" -q "$MIRROR"/"$DB".zsync
+-	then
++	if [ -n "$USEZSYNC" ] && zsync -i "$LIST" -q "$MIRROR"/"$DB".zsync; then
+ 		rm -f "$DB".zs-old
+ 	else
+-		if [ ! -f "$LIST" ]
+-		then
+-		  wget -O "$LIST".gz "$MIRROR"/"$DB".gz
+-		  gunzip "$LIST".gz
+-		fi
++		# always update if not http or zsync failed
++		rm -f "$LIST"
++		wget -O "$LIST".gz "$MIRROR"/"$DB".gz
++		gunzip "$LIST".gz
+ 	fi
+ 	chmod g+rw "$DB"
+ 	touch "$DB"
+diff --git a/usr/bin/tce b/usr/bin/tce
+index 947bfb4..c55affe 100755
+--- a/usr/bin/tce
++++ b/usr/bin/tce
+@@ -4,6 +4,9 @@
+ . /etc/init.d/tc-functions
+ trap 'echo; exit 1 1>&2' 1 2 15
+ 
++# check that the mirror is valid here
++getMirror
++
+ searchInfoList() {
+ 	clear
+ 	if [ ! -n "$ITEM" ] || [ ${ITEM:0:1} == "-" ]; then
+diff --git a/usr/bin/tce-status b/usr/bin/tce-status
+index 9346866..e5d0920 100755
+--- a/usr/bin/tce-status
++++ b/usr/bin/tce-status
+@@ -27,8 +27,9 @@ orphaned() {
+ 	echo "Standby checking for tcz files not found on:"
+ 	echo "$MIRROR"
+ 	echo
+-	MIRROR_TYPE="$(awk 'BEGIN{FS=":"}{print $1}' /opt/tcemirror)"
+-	if [ "$MIRROR_TYPE" == "http" ]; then
++
++	# allow both http and https
++	if [ "$MIRRORPROTO" != "ftp" ]; then
+ 		for E in `ls "$TCEDIR"/optional/*.tcz* 2>/dev/null`; do
+ 			E="${E##*/}"
+ 			busybox wget --spider -q "$MIRROR"/"$E" 2>/dev/null || echo "$E not found!"
+diff --git a/usr/bin/tce-update b/usr/bin/tce-update
+index a137678..cb04f9b 100755
+--- a/usr/bin/tce-update
++++ b/usr/bin/tce-update
+@@ -7,7 +7,9 @@ useBusybox
+ 
+ KERNELVER=$(uname -r)
+ getMirror
++
+-case $MIRROR in http*) [ -n "`which zsync`" ] && USEZSYNC=yes ;; esac
++# zsync only works with http
++[ "$MIRRORPROTO" == "http" ] && [ -n "`which zsync`" ] && USEZSYNC=yes
+ 
+ dep_vars(){
+ 	sed -i "s@KERNEL@$KERNELVER@" $1
+diff --git a/usr/bin/tcemirror.sh b/usr/bin/tcemirror.sh
+index 443babd..75605c3 100755
+--- a/usr/bin/tcemirror.sh
++++ b/usr/bin/tcemirror.sh
+@@ -12,6 +12,36 @@ if [ ! -s "$TMP" ]; then
+    exit 1
+ fi
+ select "Tiny Core Linux - Mirror Selection" "$TMP"
+-ANS="$(cat  /tmp/select.ans)"
++ANS="$(cat /tmp/select.ans)"
+ rm "$TMP"
+-[ "$ANS" != "q" ] && echo "$ANS" > /opt/tcemirror
++
++[ "$ANS" == "q" ] && exit
++
++MIRRORPROTO="${ANS%%://*}"
++
++# if this is changed also change /etc/init.d/tc-functions
++
++# supported protocols for mirror
++if
++  [ "$MIRRORPROTO" != "http" ] &&
++  [ "$MIRRORPROTO" != "https" ] &&
++  [ "$MIRRORPROTO" != "ftp" ]; then
++  echo "Mirror must use http[s] or ftp"
++  exit 1
++fi
++
++# https mirrors can't be done without some extensions
++if [ "$MIRRORPROTO" == "https" ]; then
++  # Test if the required extensions are installed
++  [ -e /usr/local/tce.installed/ca-certificates ] || NeedCrt=1
++  [ -e /usr/local/tce.installed/openssl ] || NeedSSL=1
++
++  if [ -n "$NeedCrt$NeedSSL" ]; then
++    echo "The following are required before using https mirrors:"
++    [ -n "$NeedCrt" ] && echo "ca-certificates.tcz"
++    [ -n "$NeedSSL" ] && echo "openssl.tcz"
++    exit 1
++  fi
++fi
++
++echo "$ANS" > /opt/tcemirror
+diff --git a/usr/bin/update-everything b/usr/bin/update-everything
+index 226e67b..4a83e64 100755
+--- a/usr/bin/update-everything
++++ b/usr/bin/update-everything
+@@ -8,7 +8,8 @@
+ #   Custom extensions (i.e., those that don't have a .md5.txt file) are left alone.
+ # Usage: $ update-everything
+ 
+-PATH="/bin:/sbin:/usr/bin:/usr/sbin"
++# note: /usr/local/bin is required so that openssl can be used for https mirrors.
++PATH="/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin"
+ export PATH
+ 
+ main()
