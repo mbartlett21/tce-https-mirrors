@@ -12,6 +12,7 @@ sudo mkdir -p /tmp/https-mirrors/usr/local/share/doc/https-mirrors
 
 sudo cp COPYING                 /tmp/https-mirrors/usr/local/share/doc/https-mirrors/COPYING
 sudo cp https-mirrors.patch     /tmp/https-mirrors/usr/local/https-mirrors/https-mirrors.patch
+sudo cp https-mirrors-pi.patch  /tmp/https-mirrors/usr/local/https-mirrors/https-mirrors-pi.patch
 sudo cp https-mirrors.installed /tmp/https-mirrors/usr/local/tce.installed/https-mirrors
 
 sudo chown root:staff \
@@ -25,11 +26,13 @@ sudo chmod g+w \
 mksquashfs /tmp/https-mirrors build/https-mirrors.tcz
 cp https-mirrors.tcz.info build/https-mirrors.tcz.info
 
-echo ca-certificates.tcz >>build/https-mirrors.tcz.dep
+echo ca-certificates.tcz  >build/https-mirrors.tcz.dep
+echo mirrors.tcz         >>build/https-mirrors.tcz.dep
 
 tar czf build/https-mirrors-source.tgz -X build -X .gitignore *
 
 if [ "$1" == "install" ]; then
+	rm -f /etc/sysconfig/tcedir/optional/https-mirrors.tcz
 	cp build/https-mirrors.tcz* -t /etc/sysconfig/tcedir/optional
 	echo https-mirrors.tcz >>/etc/sysconfig/tcedir/onboot.lst
 	tce-load -i https-mirrors.tcz

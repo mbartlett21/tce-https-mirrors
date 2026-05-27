@@ -1,14 +1,25 @@
 #!/bin/sh
 cd / >/dev/null
-patch -Np1 -i /usr/local/https-mirrors/https-mirrors.patch
 
+. /etc/os-release
+
+# patch it if before TC 17.x
+if [ "${VERSION:0:2}" -lt 17 ]; then
+	# we have an extra patch for pi, since it has a different file
+	if [ "${NAME:0:2}" == "pi" ]; then
+		patch -Np1 -i /usr/local/https-mirrors/https-mirrors-pi.patch
+	else
+		patch -Np1 -i /usr/local/https-mirrors/https-mirrors.patch
+	fi
+fi
+
+# if we are doing it by symlinks, it has to copy it so that we can edit it
 if [ -L /usr/local/share/mirrors ]; then
 	rm /usr/local/share/mirrors
 	cp /tmp/tcloop/mirrors/usr/local/share/mirrors /usr/local/share/mirrors
 fi
 
-if [ -e /usr/local/share/mirrors ]; then
-	cat <<EOF >>/usr/local/share/mirrors
+cat <<EOF >>/usr/local/share/mirrors
 https://distro.ibiblio.org/tinycorelinux/
 https://ftp.nluug.nl/os/Linux/distr/pub/linux/distributions/tinycorelinux/
 https://sunsite.icm.edu.pl/pub/Linux/sunsite.unc.edu/distributions/tinycorelinux/
@@ -17,6 +28,5 @@ https://mirror.cedia.org.ec/tinycorelinux/
 https://mirrors.dotsrc.org/tinycorelinux/
 https://mirrors.163.com/tinycorelinux/
 EOF
-fi
 
 cd - >/dev/null
